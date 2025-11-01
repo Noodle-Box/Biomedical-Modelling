@@ -24,6 +24,8 @@ Simulation 4: t(QT): QT Interval duration (ms)
 
 import numpy as np
 import matplotlib.pyplot as plt
+from typing import Optional 
+
 ###################################################################################
 ### Parameters for Simulation ###
 
@@ -47,7 +49,7 @@ def delta(t: int, n: int, tau: int) -> int:
 # -----------------------------
 # PK parameters (units in comments)
 # -----------------------------
-V_SC   = 70.0                     # (L)      apparent central volume
+V   = 70.0                     # (L)      apparent central volume
 kAbsorptionBS   = 0.6                      # (1/h)    first-order absorption from gut, from (...)
 KDISS  = 0.8                      #          tablet absorption efficiency
 t_half = 10.0                     # h        elimination half-life, from (...)
@@ -68,9 +70,10 @@ kBlock = 0.25                     #          fractional block at high concentrat
 
 """ Tuning pameters for parameterisation """
 k1 = 5                           #           Emax (≤1.0), part of Kbinding calculation
-k2 = 3e2                         #           dimensionless gain on repolarization scaling
-k3 = 1.5                         #           curvature exponent in Eq. 3 (tune)
-k4 = 4e-1                      #           scaling from Δt_repolar to QT (ms per ms * factor in Eq. 4)
+k2 = (5e-3)
+k3 = 3e2                         #           dimensionless gain on repolarization scaling
+k4 = 1.5                         #           curvature exponent in Eq. 3 (tune)
+k5 = 4e-1                      #           scaling from Δt_repolar to QT (ms per ms * factor in Eq. 4)
 
 # Hill Mechanics Parameters
 EC50 = 20                        # (mg/L)     — tune with your data
@@ -98,13 +101,14 @@ class DosageSimulator:
     Discrete-hour simulator (mirrors your reference structure and the previous code),
     with states and outputs recorded each hour.
     """
-    def __init__(self, dose_hours: int, regimen: tuple = (250.0, 125.0), label: str | None = None):
+    def __init__(self, dose_hours: int, regimen: tuple = (250.0, 125.0), label: Optional[str] = None):
+
         self.num_hours = dose_hours
         # Regimen: (first two doses, subsequent)
         self.set_regimen(regimen, label)
         self.initial_values()
 
-    def set_regimen(self, regimen: tuple, label: str | None = None):
+    def set_regimen(self, regimen: tuple, label: Optional[str] = None):
         self.regimen_first, self.regimen_after = float(regimen[0]), float(regimen[1])
         self.regimen_label = label if label is not None else f"{int(self.regimen_first)} mg x2 then {int(self.regimen_after)} mg, q12h"
 
@@ -137,8 +141,8 @@ class DosageSimulator:
             """ Simulation 1 - Dofetilide concentration in blood (mg/L) """
 
             # Input dose calculation with first-order absorption  
-            dose_input = (D / V_SC) * kAbsorption * np.exp(-kAbsorption * (t % tau))
-            C_new = self.C_dof[t]*(1 - kDecay - KBinding) + dose_input
+            Fin = (D / V) * kAbsorption * np.exp(-kAbsorption * (t % tau))
+            C_new = self.C_dof[t]*(1 - kDecay - KBinding) + Fin
             self.C_dof.append(C_new)
 
         
@@ -147,7 +151,7 @@ class DosageSimulator:
             # Concentration value and concentration-driven term to calculate IKr
             C_eff = self.C_dof[-1]
             r_bind = KBinding * C_eff
-            block_base = (hill_mech(r_bind)/k1 - (5e-3)*kDecay*C_eff)
+            block_base = (hill_mech(r_bind)/k1 - k2*kDecay*C_eff)
             # Additional saturating concentration term to help differentiate regimens
             conc_term = kBlock * (C_eff / (EC50 + C_eff)) 
             block = block_base + conc_term
@@ -156,11 +160,11 @@ class DosageSimulator:
             self.IKr.append(IKr_current)
 
             """ Simulation 3 - Repolarization time of ventricular A.P (ms) """
-            t_repolar = (t0_repolar_ms + (k2 * (block)**k3)) 
+            t_repolar = (t0_repolar_ms + (k3 * (block)**k4)) 
             self.t_repolar.append(t_repolar)
 
             """ Simulation 4 - QT Interval duration (ms) """
-            t_QT = t0_QT_ms + k4 * (self.t_repolar[t] - t0_repolar_ms) 
+            t_QT = t0_QT_ms + k5 * (self.t_repolar[t] - t0_repolar_ms) 
             self.t_QT_ms.append(t_QT)
 
             # Increment time
