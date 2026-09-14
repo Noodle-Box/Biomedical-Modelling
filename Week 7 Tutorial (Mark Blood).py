@@ -1,24 +1,12 @@
-##############################################################################
-#
-#
-# BIOE3001: Quantitative Methods in Biomedical Engineering
-# Tevyn Vergara | 46421201 
-#
-# Main Code for Levosimendan Model
-#
-#
-#
-############################# Import Libraries ################################
+
+############################# Import Libraries ###############################
 import numpy as np
 import matplotlib.pyplot as plt
  
-################################# Time Course #################################
 ## Time course
 dt = 0.1 #d
 T = 100 #d
-
-############################# Parameters ######################################
-
+## Parameters - suppose Doxorubicin
 ksc = 0.051*dt #/day stem proliferation rate
 kcc = 0.105*dt #/day cancer proliferation rate
 kwbc = 0.04*dt #/day WBC differentiation rate
@@ -31,8 +19,6 @@ kdecay = (-np.log(0.5)/0.6)*dt #/day
 kconv = 6e16*dt#g/mL/d
 kmax = 2e-16
 kM = 10**-5#g/mL
-
-######################### Initial Conditions ##################################
 ## Initial Conditions
 Nsc = [None] * int(T//dt)
 Ncc = [None] * int(T//dt)
@@ -46,8 +32,8 @@ Cche[1] = 0 #g/mL
 ## Setting Injection
 InjFreq = np.array([10, 30, 50,70,90])/dt #d
 
-############################# Main Loop #######################################
 
+## Run Simulation
 for t in range(1,int(T//dt-1)):
     dNsc = ksc*Nsc[t]*(1 - kconv*(kmax*Cche[t])/(kM+Cche[t])) - Nsc[t]*kwbc - Nsc[t]*kdsc
     dNcc = kcc*Ncc[t]*(1 -kconv*(kmax*Cche[t])/(kM+Cche[t])) -Ncc[t]*kdcc
@@ -79,4 +65,3 @@ plt.ylabel('WBCs')
 plt.xlabel('Time (d)')
 plt.show()
 
-########################## Loading Patient Data ###############################
