@@ -77,7 +77,7 @@ ML_TO_M3 = 1e-6  # m^3 per mL
 # Hill Kinetics for drug binding to affect stroke volume
 SV0 = 70.0 * ML_TO_M3  # m^3, baseline SV. From [7]
 dSVmax = 0.167  # fractional max SV rise. From [3]
-EC50_SV = 0.05  # ng/mL (FITTED)
+EC50_SV = 0.497  # ng/mL (FITTED)
 
 # Hill Kinetics for drug binding to affect heart rate [6]
 HR0 = 70.0 / 60.0  # Hz, baseline heart rate
@@ -85,8 +85,8 @@ Emax_HR = 0.171  # fractional max HR rise. From [2][3]
 EC50_HR = 0.78  # ng/mL, direct Hill term (FITTED)
 
 # Hill Kinetics for drug binding to dilating system "body" vasculature
-Emax_R = 0.317  # fractional max R_sys drop. From [3]
-EC50_sys = 0.05  # ng/mL (FITTED)
+Emax_R = 0.358  # fractional max R_sys drop. From [3]
+EC50_sys = 0.498  # ng/mL (FITTED)
 
 # Derivation for baseline systemic resistance
 # (how hard blood is pushed through vessels)
@@ -110,8 +110,8 @@ Q_cereb0 = v_cereb0 * A_cereb  # m^3/s, baseline cerebral flow (DERIVED)
 R_cereb0 = CPP0 / Q_cereb0  # Pa.s/m^3, baseline cerebral resistance (DERIVED)
 
 # Hill kinetics for drug binding to cerebral vasculature resistance
-Emax_cereb = 0.065  # fractional max R_cereb drop. From [2]
-EC50_cereb = 0.03  # ng/mL (FITTED)
+Emax_cereb = 0.24  # fractional max R_cereb drop. From [2]
+EC50_cereb = 0.5  # ng/mL (FITTED)
 
 # Effect-Compartment Delay to represent time taken for drug to reach and act on tissue
 # Without it, PDs crash at t = 30
