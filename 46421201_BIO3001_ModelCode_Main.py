@@ -30,39 +30,37 @@ T = 300                            # hrs, time course
 BW = 80                            # kg, sample body weight
 dose = 100                         # ng/kg/min, dosing infusion rate           
 T_inf = 24                         # hrs, infusion duration          
-C_peak = 100                       # ng/mL, max plasma concentration of infusion
+C_peak = 59                        # ng/mL, max plasma concentration of infusion
                  
 # Infusion conversions for main loop
-V = dose*BW*60                     # ng/kg/min, infusion rate whole body rate
-
-# Pre-defined half life here to solve for steady-state constant R
-V = V/((np.log(2)/0.9)*C_peak)
+Rate_ref = dose*BW*60                       # ng/hr infusion rate whole body rate
 
 # Infusion Rate going in during 24-hour infusion regimen
-R = (dose*BW*60/V)*dt              # ng/mL, added per step
+levo_half = 0.9                             # hrs, Levosimendan half-life, from [1] 
+V = Rate_ref/((np.log(2)/levo_half)*C_peak) # mL, volume distribution (DERIVED)
+R = (Rate_ref/V)*dt                         # ng/mL, added per step
 
 ################### Parameters: Drug (Pharmacokinetics) #######################
 
 # Parameters: Levosimendan (Active)
-k0 = (np.log(2)/0.9)*dt            # 1/Hrs, half-life decay. From [1]
-f0 = 0.03                          # Free Fraction. From [4]
+k0 = (np.log(2)/levo_half)*dt      # 1/Hrs, half-life decay
+f0 = 0.05                          # Free Fraction Levosimendan (FITTED)
 
 # Parameters: Gut Transit Compartment (Time Delay between parent and metabolites)
 T_gut = 30                         # hrs, time when gut starts to release (FITTED FROM [1]) 
 kg = (np.log(2)/17.4)*dt           # 1/hrs, gut release rate (FITTED)
 
 # Parameters: OR-1855 Metabolite (Unactive)
+# No free fraction needed as OR-1855 does not contribute to active drug
 k1 = (np.log(2)/61)*dt             # 1/Hrs, half-life decay. From [1]
-f1 = 0.58                          # Free Fraction OR-1855. From [4]
 m1 = 0.0045                        # Formation Fraction from Levo (FITTED)
                                 
 # Parameters: OR-1896 Metabolite (Active)
 k2 = (np.log(2)/62)*dt             # 1/Hrs, half-life decay. From [1]
 f2 = 0.61                          # Free Fraction OR-1896. From [4]
 
-# Parameters: Back-Conversion (OR-1855 <--> OR-1896) through NAT2 enzyme
-kac = (np.log(2)/1.8)*dt           # 1/Hrs, acetylation (FITTED)
-kbk = (np.log(2)/2.35)*dt           # 1/Hrs, deacetylation (FITTED)
+# Parameters: Acetylation (OR-1855 -> OR-1896) through NAT2 enzyme
+kac = (np.log(2)/40)*dt           # 1/Hrs, acetylation (FITTED)
                                   
 ################### Parameters: Body (Pharmacodynamics) #######################
 
@@ -71,12 +69,6 @@ kbk = (np.log(2)/2.35)*dt           # 1/Hrs, deacetylation (FITTED)
 # Conversion macros
 MMHG_TO_PA = 133.322               # Pa per mmHg
 ML_TO_M3   = 1e-6                  # m^3 per mL
-
-# Blood and artery parameters
-RHO    = 1060.0                    # kg/m^3, blood density. From [5]
-    
-### Parameters: Heart Block (Ce_eff --> SV, HR, MAP)
-A_ao   = 7.07e-4                   # m^2, aortic cross-section. From [5]
 
 # Hill Kinetics for drug binding to affect stroke volume
 SV0     = 70.0 * ML_TO_M3            # m^3, baseline SV. From [7]
@@ -93,24 +85,25 @@ Emax_R   = 0.317                   # fractional max R_sys drop. From [3]
 EC50_sys = 0.05                    # ng/mL (FITTED)
 
 # Derivation for baseline systemic resistance 
-# (how hard blood is push through vessels)
-# Resistance = pressure / flow, both baseline
+# (how hard blood is pushed through vessels)
+# Resistance = (pressure / flow), both baseline
 MAP0 = 93.0 * MMHG_TO_PA           # Pa, Baseline MAP. From [8]
 CO0    = SV0 * HR0                 # m^3/s, baseline cardiac output (DERIVED)
 R_sys0 = MAP0/CO0                  # Pa.s/m^3, baseline systemic resistance (DERIVED)
 
-### Parameters: Brain Block (MAP, Ce_eff, CO --> V_cereb)
+### Parameters: Brain Block (MAP, Ce_eff --> V_cereb)
 
-ICP_Pa = 10.0 * MMHG_TO_PA         # Pa, intracranial pressure. From [9]
-R_MCA  = 0.0015                    # m, MCA radius. From [5]
-A_MCA  = np.pi * (R_MCA)**2        # m^2, MCA cross-section
+P_brain = 10.0 * MMHG_TO_PA         # Pa, intracranial pressure. From [9]
+r_cereb  = 0.0015                    # m, MCA radius. From [5]
+A_cereb  = np.pi * (r_cereb)**2        # m^2, MCA cross-section
 
 # Derivation for baseline cerebral resistance, similar to R_sys
 # Resistance = pressure / flow, both baseline)
-v_MCA0 = 0.48                      # m/s, baseline MCA velocity. From [2]
-CPP0 = MAP0 - ICP_Pa               # Pa, baseline cerebral perfusssion (DERIVED)
-Q_MCA0 = v_MCA0 * A_MCA            # m^3/s, baseline cerebral flow (DERIVED)
-R_cereb0 = CPP0/Q_MCA0             # Pa.s/m^3, baseline cerebral resistance (DERIVED)
+
+v_cereb0 = 0.48                      # m/s, baseline MCA velocity. From [2]
+CPP0 = MAP0 - P_brain               # Pa, baseline cerebral perfusion (DERIVED)
+Q_cereb0 = v_cereb0 * A_cereb            # m^3/s, baseline cerebral flow (DERIVED)
+R_cereb0 = CPP0/Q_cereb0             # Pa.s/m^3, baseline cerebral resistance (DERIVED)
 
 # Hill kinetics for drug binding to cerebral vasculature resistance
 Emax_cereb = 0.065                 # fractional max R_cereb drop. From [2]
@@ -123,30 +116,29 @@ k_eo = (np.log(2)/keo_thalf)*dt    # 1/hrs, pre-multiplied by dt
 
 ### Heart (Mass Transfer System) ###
 #
-# Takes lagged effective drug and runs three Hill Kinetic responses 
-# System resistance, stroke volume and heart rate. 
-# Used to output MAP and cardiac output --> Brain
+# Takes effective drug from dose and lags it to Ce_eff
+# Then, runs three Hill Kinetic responses:
+# System resistance, stroke volume and heart rate.
+# Outputs MAP and Ce_eff --> Brain 
 #
-def heart_block(Ce_val):
-    R_sys_v = R_sys0 * (1 - Emax_R*Ce_val/(EC50_sys + Ce_val))
-    SV_v    = SV0 * (1 + dSVmax*Ce_val/(EC50_SV + Ce_val))
-    HR_v    = HR0 * (1 + Emax_HR*Ce_val/(EC50_HR + Ce_val))
+def heart_block(Ce_val, Ce_eff_prev):
+    Ce_eff_v = Ce_eff_prev + k_eo*(Ce_val - Ce_eff_prev)
+    R_sys_v = R_sys0 * (1 - Emax_R*Ce_eff_v/(EC50_sys + Ce_eff_v))
+    SV_v    = SV0 * (1 + dSVmax*Ce_eff_v/(EC50_SV + Ce_eff_v))
+    HR_v    = HR0 * (1 + Emax_HR*Ce_eff_v/(EC50_HR + Ce_eff_v))
     CO_v    = SV_v * HR_v
     MAP_v   = CO_v * R_sys_v
-    return R_sys_v, SV_v, HR_v, CO_v, MAP_v
+    return Ce_eff_v, R_sys_v, SV_v, HR_v, CO_v, MAP_v
 
 ### Cerebral Vasculature (Mass Transfer System) ###
 #
-# Takes lagged effecive drug, MAP and cardiac output
-# Combined for Bernoulli's equation to solve for blood velocity
-# V_cereb arranged in quadratic response to produce final output
-# Equations from Dale lecture [5]
-def cerebral_block(Ce_val, MAP_v, CO_v):
+# Takes lagged effective drug and MAP (both from the heart block)
+# Combined lumped resistance and MAP to solve for blood velocity
+# Equations from [5].
+def cerebral_block(Ce_val, MAP_v):
     Cerebral_R = R_cereb0*(1 - Emax_cereb*Ce_val/(EC50_cereb + Ce_val))
-    Aortic_V = CO_v/A_ao
-    A_term = Cerebral_R*A_MCA
-    Blood_V = (-A_term + np.sqrt(A_term**2 + 2*RHO*(MAP_v-ICP_Pa) + RHO**2*Aortic_V**2)) / RHO
-    return Cerebral_R, Aortic_V, Blood_V
+    Blood_V = (MAP_v - P_brain)/(Cerebral_R * A_cereb)
+    return Cerebral_R, Blood_V
 
 
 ######################### Initial Conditions ##################################
@@ -173,7 +165,6 @@ HR      = [None] * int(T//dt)         # Hz, heart rate
 CO      = [None] * int(T//dt)         # m^3/s, cardiac output
 MAP     = [None] * int(T//dt)         # Pa, mean arterial pressure
 R_cereb = [None] * int(T//dt)         # Pa.s/m^3, cerebral resistance
-V_ao    = [None] * int(T//dt)         # m/s, aortic velocity
 V_cereb = [None] * int(T//dt)         # m/s, cerebral blood velocity
 
 MAP[0] = 0                            # Pa
@@ -192,8 +183,8 @@ Ce[1] = 0                             # ng/mL
 Ce_eff[0] = 0                         # ng/mL
 Ce_eff[1] = 0                         # ng/mL
 for idx in (0, 1):
-    (R_sys[idx], SV[idx], HR[idx], CO[idx], MAP[idx]) = heart_block(Ce_eff[idx])
-    (R_cereb[idx], V_ao[idx], V_cereb[idx]) = cerebral_block(Ce_eff[idx], MAP[idx], CO[idx])
+    (_, R_sys[idx], SV[idx], HR[idx], CO[idx], MAP[idx]) = heart_block(Ce[idx], Ce_eff[idx])
+    (R_cereb[idx], V_cereb[idx]) = cerebral_block(Ce_eff[idx], MAP[idx])
 
 for t in range(1,int(T//dt-1)):
 
@@ -217,31 +208,26 @@ for t in range(1,int(T//dt-1)):
     dCGut = m1*k0*CLevo[t] - Rel
     CGut[t+1] = CGut[t] + dCGut
 
-    ### OR-1855 (UNACTIVE Metabolite) ###
+    ### OR-1855 (INACTIVE Metabolite) ###
     
-    # Formed by gut metabolism, dacetylation, lost from acetylation (1896) and self decay
-    dC1855 = Rel - k1*C1855[t] - kac*C1855[t] + kbk*C1896[t]
+    # Formed by gut metabolism, lost from acetylation (1896) and self decay
+    dC1855 = Rel - k1*C1855[t] - kac*C1855[t]
     C1855[t+1] = C1855[t] + dC1855
 
     ### OR-1896 (ACTIVE Metabolite) ###
 
-    # Formed by acetylation, lost back to OR-1855 and self decay
-    dC1896 = kac*C1855[t] - kbk*C1896[t] - k2*C1896[t]
+    # Formed by acetylation and self decay
+    dC1896 = kac*C1855[t] - k2*C1896[t]
     C1896[t+1] = C1896[t] + dC1896
 
-    ### Pharmacodynamics: Ce --> Ce_eff 
-
+    ### Active Drug Concentration (PK Output)
     Ce[t+1] = f0*CLevo[t+1] + f2*C1896[t+1]
 
-    # Effect-Compartment for shape
-    dCe_eff = k_eo*(Ce[t] - Ce_eff[t])
-    Ce_eff[t+1] = Ce_eff[t] + dCe_eff
-
     ### Heart (Mass Transfer System) ###
-    (R_sys[t+1], SV[t+1], HR[t+1], CO[t+1], MAP[t+1]) = heart_block(Ce_eff[t+1])
+    (Ce_eff[t+1], R_sys[t+1], SV[t+1], HR[t+1], CO[t+1], MAP[t+1]) = heart_block(Ce[t], Ce_eff[t])
 
     ### Cerebral Vasculature (Mass Transfer System) ###
-    (R_cereb[t+1], V_ao[t+1], V_cereb[t+1]) = cerebral_block(Ce_eff[t+1], MAP[t+1], CO[t+1])
+    (R_cereb[t+1], V_cereb[t+1]) = cerebral_block(Ce_eff[t+1], MAP[t+1])
 
 
 ############################## Plot Figure ####################################
@@ -250,7 +236,7 @@ time = np.arange(0,int(T//dt))*dt  # hrs, x-axis in real time not step number
 
 ## Clinical data of parent drug and metabolites, from Table 1 data
 t_data    = [24,25,26,28,30,36,37,38,40,44,48,60,72,96,144,192,240]
-levo_data = [100, 50, 20, 5, 1.3, 0.02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+levo_data = [59, 22.4, 10.4, 4.1, 1.12, 0.02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 m1_data   = [0,0,0,0,0.05,0.8,0.9,1.05,1.2,1.55,2.1,1.9,1.95,1.5,0.7,0.35,0.15]
 m2_data   = [0,0,0,0,0.1,0.6,0.7,0.85,1.1,1.75,2.35,2.4,2.35,2.05,1.2,0.55,0.3]
 
@@ -263,12 +249,12 @@ plt.xlabel('Time (hrs)')
 plt.title('Levosimendan (Parent) vs Clinical Data')
 plt.show()
 
-## OR-1855 against the clinical data [1]
+## GUT Transition of OR1855
 plt.figure()
 plt.plot(time, CGut)
 plt.ylabel('Gut Concentration (ng/mL)')
 plt.xlabel('Time (hrs)')
-plt.title('Gut concentration of Levosimendan (Time Compartment')
+plt.title('Gut Transit of OR-1855 metabolite (Time Compartment)')
 plt.show()
 
 ## OR-1896 against the clinical data [1]
@@ -286,7 +272,7 @@ MAP_mmHg    = np.array(MAP)/MMHG_TO_PA
 HR_bpm      = np.array(HR)*60
 V_cereb_cms = np.array(V_cereb)*100
 
-t_settled = 2.0                       # hrs
+t_settled = 2.0 # hrs
 mask = time >= t_settled
 
 plt.figure()

@@ -1,0 +1,4 @@
+# Whitelist: ignore everything, then allow only the main model code
+*
+!.gitignore
+!46421201_BIO3001_ModelCode_Main.py
